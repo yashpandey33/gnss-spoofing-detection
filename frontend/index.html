@@ -216,7 +216,7 @@
 </div>
 
 <script>
-const API = "http://127.0.0.1:8000";
+const API = window.location.origin;
 let charts = [], map, mapFeatures, mapHasFit = false, playbackTimer = null, playbackData = null, playbackIndex = 0, playbackMarker = null;
 const PLAYBACK_INTERVAL_MS = 100;
 const CHART_WINDOW = 120;
@@ -316,7 +316,7 @@ function renderLiveDemo(){
     playbackTimer = setInterval(advancePlayback, PLAYBACK_INTERVAL_MS);
   }).catch(e => {
     document.getElementById("playbackClock").textContent =
-      "API error: " + e.message + " (check http://127.0.0.1:8000/docs)";
+    "API error: " + e.message + " (check " + API + "/docs)";
   });
 }
 function playbackFrame(d, end) {
