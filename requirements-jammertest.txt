@@ -1,0 +1,3 @@
+georinex
+xarray
+netcdf4

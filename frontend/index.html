@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"><title>GNSS Spoofing & Jamming Dashboard</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{color-scheme:dark;--bg:#07111f;--surface:#0d1a2b;--surface-raised:#122238;--line:#22354d;--text:#e8f0fb;--muted:#91a4bc;--cyan:#4cc9f0;--green:#38d996;--amber:#f8bf59;--red:#ff667a;--purple:#c084fc;--orange:#fb9b57}
+  *{box-sizing:border-box}
+  body{margin:0;min-width:320px;font-family:"Aptos","Segoe UI Variable","Segoe UI",Arial,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;background:radial-gradient(ellipse at 60% -20%,#193452 0,transparent 46%),var(--bg);color:var(--text)}
+  .app-shell{min-height:100vh;display:flex;flex-direction:column}
+  .topbar{position:sticky;top:0;z-index:500;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px 30px;border-bottom:1px solid rgba(145,164,188,.16);background:rgba(7,17,31,.91);backdrop-filter:blur(18px)}
+  .brand{display:flex;align-items:center;gap:14px;min-width:0}
+  .brand-mark{width:42px;height:42px;flex:none;border-radius:13px;background:linear-gradient(145deg,#38bdf8,#2563eb);display:grid;place-items:center;font-size:20px;font-weight:900;color:white;box-shadow:0 8px 24px #0ea5e944}
+  .eyebrow{font-size:10px;letter-spacing:.14em;color:var(--cyan);font-weight:700;text-transform:uppercase}
+  h1,h2,h3{font-family:inherit}
+  h2{margin:4px 0 0;font-size:17px;font-weight:650;letter-spacing:-.015em;line-height:1.35}
+  .topbar-right{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap}
+  .pill{padding:7px 11px;border-radius:999px;border:1px solid var(--line);font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+  .pill.live{background:#123528;color:#8ef0c2;border-color:#286448}
+  .pill.live:before{content:"";display:inline-block;width:7px;height:7px;margin:0 7px 1px 0;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green)}
+  .pill.meta{background:#10263b;color:#9be5fb;border-color:#214d6b}
+  .main-grid{display:grid;grid-template-columns:226px minmax(0,1fr);min-height:0;flex:1}
+  .sidebar{padding:25px 15px;border-right:1px solid rgba(145,164,188,.13);background:rgba(9,21,36,.72)}
+  .sidebar:before{content:"WORKSPACE";display:block;margin:0 12px 13px;color:#637890;font-size:10px;font-weight:800;letter-spacing:.16em}
+  .sidebar .tabs{display:flex;flex-direction:column;gap:6px}
+  .tabs button{display:flex;align-items:center;gap:11px;width:100%;padding:12px 13px;border:1px solid transparent;border-radius:10px;background:transparent;color:var(--muted);cursor:pointer;text-align:left;font-family:inherit;font-size:13px;font-weight:600;line-height:1.4;transition:background .18s ease,border-color .18s ease,color .18s ease}
+  .tabs button:before{content:"";width:7px;height:7px;border:1.5px solid #71869f;border-radius:2px;transform:rotate(45deg);transition:all .18s ease}
+  .tabs button:hover{background:#13253a;color:var(--text)}
+  .tabs button.on{background:linear-gradient(100deg,#123650,#10253a);color:#eafaff;border-color:#245372;box-shadow:inset 3px 0 #38bdf8}
+  .tabs button.on:before{background:var(--cyan);border-color:var(--cyan);box-shadow:0 0 10px #38bdf880}
+  .main-panel{width:100%;max-width:1600px;margin:0 auto;padding:27px 30px 36px;display:flex;flex-direction:column;gap:20px}
+  .workspace-heading{position:relative;isolation:isolate;display:grid;grid-template-columns:minmax(250px,1fr) 200px auto;align-items:center;gap:18px;min-height:190px;padding:22px 26px;border:1px solid #264865;border-radius:20px;overflow:hidden;background:radial-gradient(ellipse at 70% 50%,#143b5b 0,transparent 38%),linear-gradient(120deg,#10263e,#0b192c 70%);box-shadow:0 20px 55px #00000030}
+  .workspace-heading:before{content:"";position:absolute;inset:0;z-index:-1;opacity:.24;background-image:linear-gradient(#65bfe60c 1px,transparent 1px),linear-gradient(90deg,#65bfe60c 1px,transparent 1px);background-size:28px 28px;mask-image:linear-gradient(90deg,transparent 10%,#000 100%)}
+  .hero-copy{position:relative;z-index:2}
+  .workspace-heading .kicker{color:var(--cyan);font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+  .workspace-heading h1{max-width:520px;margin:8px 0 0;font-size:clamp(25px,3vw,38px);font-weight:650;line-height:1.18;letter-spacing:-.035em}
+  .workspace-heading p{max-width:480px;margin:10px 0 0;color:#a8bbcf;font-size:13px;line-height:1.55}
+  .workspace-actions{position:relative;z-index:2;display:flex;align-items:flex-end;flex-direction:column;gap:11px}
+  .orbit-visual{position:relative;width:200px;height:156px;justify-self:center;perspective:700px;filter:drop-shadow(0 0 24px #31c9fc25);transform:scale(.88)}
+  .orbit-visual:before{content:"";position:absolute;left:40px;right:40px;bottom:15px;height:20px;border-radius:50%;background:#21b6f533;filter:blur(16px)}
+  .orbit-globe{position:absolute;left:67px;top:37px;width:86px;height:86px;border:1px solid #62d6ff99;border-radius:50%;background:radial-gradient(ellipse at 31% 29%,#8df1ff 0,#299ac6 12%,#11527b 38%,#09233e 71%,#06172c 100%);box-shadow:inset -12px -8px 20px #02081799,inset 8px 5px 18px #70e7ff66,0 0 28px #31c9fc55;transform:translateZ(18px);overflow:hidden}
+  .orbit-globe:before{content:"";position:absolute;inset:-10%;border-radius:50%;opacity:.48;background:radial-gradient(ellipse at 30% 39%,#8bdfb5 0 8%,transparent 9%),radial-gradient(ellipse at 56% 30%,#58bd98 0 11%,transparent 12%),radial-gradient(ellipse at 62% 61%,#7ed8a7 0 14%,transparent 15%),radial-gradient(ellipse at 27% 68%,#56b796 0 7%,transparent 8%);filter:blur(1px)}
+  .orbit-ring{position:absolute;left:22px;top:20px;width:176px;height:112px;border:1px solid #6adfff8c;border-radius:50%;transform:rotateX(68deg) rotateZ(-24deg);transform-style:preserve-3d}
+  .orbit-ring:after{content:"";position:absolute;inset:9px;border:1px dashed #6adfff38;border-radius:50%}
+  .orbit-ring.ring-two{left:34px;top:4px;width:152px;height:148px;border-color:#bb91ff75;transform:rotateX(70deg) rotateZ(52deg);animation:orbit-turn 20s linear infinite}
+  .orbit-ring.ring-three{left:43px;top:14px;width:134px;height:128px;border-color:#45d5bb55;transform:rotateX(72deg) rotateZ(-67deg);animation:orbit-turn-reverse 25s linear infinite}
+  .orbit-satellite{position:absolute;z-index:3;top:34px;left:39px;width:12px;height:12px;border:2px solid #e8fbff;border-radius:3px;background:#48d9ff;box-shadow:0 0 13px #47d9ff;transform:rotate(45deg);animation:satellite-drift 8s ease-in-out infinite}
+  .orbit-satellite.sat-two{top:128px;left:171px;width:8px;height:8px;border-color:#e8d6ff;background:#b98cff;box-shadow:0 0 12px #b98cff;animation-delay:-3.5s}
+  .orbit-label{position:absolute;z-index:4;color:#9ac8de;font-size:8px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+  .orbit-label.label-top{top:4px;left:50%;transform:translateX(-50%)}
+  .orbit-label.label-bottom{bottom:0;left:50%;transform:translateX(-50%);white-space:nowrap}
+  @keyframes orbit-turn{to{transform:rotateX(70deg) rotateZ(412deg)}}
+  @keyframes orbit-turn-reverse{to{transform:rotateX(72deg) rotateZ(-427deg)}}
+  @keyframes satellite-drift{0%,100%{translate:0 0}50%{translate:9px -6px}}
+  .playback-clock{color:#a7bfd4;font-size:12px;font-variant-numeric:tabular-nums}
+  .playback-button{padding:9px 13px;border:1px solid #28644e;border-radius:9px;background:#123528;color:#adf0d2;font:inherit;font-size:12px;font-weight:750;cursor:pointer;transition:background .18s ease,border-color .18s ease}
+  .playback-button:hover{background:#194735;border-color:#38d996}
+  .playback-button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+  .status-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px}
+  .status-card{position:relative;overflow:hidden;min-height:112px;padding:17px 18px;border:1px solid rgba(145,164,188,.17);border-radius:14px;background:linear-gradient(145deg,rgba(18,34,56,.96),rgba(12,25,42,.96));box-shadow:0 8px 24px #00000014}
+  .status-card:after{content:"";position:absolute;top:0;right:0;width:54px;height:54px;border-radius:0 0 0 54px;background:rgba(76,201,240,.045)}
+  .status-card label{display:block;color:#9aacc2;font-size:10px;text-transform:uppercase;letter-spacing:.09em;font-weight:650}
+  .status-card strong{display:block;margin-top:12px;font-size:28px;line-height:1.1;font-weight:700;letter-spacing:-.025em;font-variant-numeric:tabular-nums}
+  .status-card .sub{margin-top:8px;color:#91a4bc;font-size:11px}
+  .status-card.trust-card{border-color:#25617d;background:linear-gradient(125deg,#10334a,#102238 68%);box-shadow:inset 0 1px #47c9ef33,0 10px 28px #00000020}
+  .status-card.trust-card label{color:#8adff6}
+  .status-card.trust-card strong{margin-top:9px;font-size:36px;color:#38d996;font-weight:700}
+  .status-card.trust-card .sub{font-size:12px}
+  .trust-meter{height:6px;margin-top:12px;border-radius:99px;background:#263a4d;overflow:hidden}
+  .trust-meter span{display:block;width:0;height:100%;border-radius:inherit;background:#38d996;transition:width .18s ease,background .18s ease}
+  .trust-readout{display:flex;align-items:baseline;gap:7px}
+  .trust-readout .unit{color:#aac0d7;font-size:13px;font-weight:650;letter-spacing:0}
+  #alertCount{color:var(--amber)}
+  #thresholdValue{color:#8bdff4}
+  #statusValue{color:var(--green)}
+  #statusValue.alert{color:var(--red)}
+  #stat{font-size:11px;color:var(--muted);font-weight:600}
+  .panel{display:none;padding:0}
+  .panel.on{display:block}
+  .panel-card{padding:18px;border:1px solid rgba(145,164,188,.16);border-radius:17px;background:linear-gradient(145deg,rgba(15,29,47,.97),rgba(11,23,39,.97));box-shadow:0 16px 40px #00000024}
+  .panel-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:1px 1px 14px}
+  .panel-title h3{margin:0;font-size:15px;font-weight:650;letter-spacing:-.01em}
+  .panel-title span{color:var(--muted);font-size:11px}
+  .note{border:1px solid #76562b;background:linear-gradient(90deg,#332618,#211d1a);padding:11px 14px;border-radius:10px;color:#f4cd89;font-size:12px;line-height:1.6;margin-bottom:13px}
+  .alerts{margin-bottom:13px}
+  .alerts .bad{background:linear-gradient(100deg,#371c2a,#241a27);border:1px solid #71364b;border-left:3px solid var(--red);padding:12px 14px;border-radius:10px;color:#ffd2da;font-size:12px;line-height:1.8}
+  .alerts .ok{background:#122b27;border:1px solid #28644e;border-left:3px solid var(--green);padding:12px 14px;border-radius:10px;color:#adf0d2;font-size:12px}
+  #map{height:min(62vh,680px);min-height:380px;border-radius:12px;overflow:hidden;border:1px solid #2b3c50}
+  .box{height:32vh;min-height:250px;margin-bottom:14px;padding:7px;border-radius:12px;overflow:hidden;border:1px solid rgba(145,164,188,.16);background:#0b1727}
+  .box:last-child{margin-bottom:0}
+  .box canvas{display:block;width:100%!important;height:100%!important}
+  .metric-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+  .metric-summary article,.metric-block{padding:15px;border:1px solid rgba(145,164,188,.16);border-radius:12px;background:#0b1727}
+  .metric-summary label{display:block;color:#9aacc2;font-size:10px;font-weight:650;letter-spacing:.08em;text-transform:uppercase}
+  .metric-summary strong{display:block;margin-top:8px;color:#7fe0fa;font-size:24px;font-variant-numeric:tabular-nums}
+  .metric-summary small{display:block;margin-top:5px;color:var(--muted);font-size:11px}
+  .metric-block{margin-top:14px;overflow-x:auto}
+  .metric-block h4{margin:0 0 11px;font-size:13px;font-weight:650}
+  .metric-table{width:100%;border-collapse:collapse;min-width:650px;font-size:12px}
+  .metric-table th,.metric-table td{padding:10px 12px;border-bottom:1px solid rgba(145,164,188,.12);text-align:right;white-space:nowrap}
+  .metric-table th{color:#91a4bc;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
+  .metric-table th:first-child,.metric-table td:first-child{text-align:left}
+  .metric-table tbody tr:last-child td{border-bottom:0}
+  .metric-table tbody tr:hover{background:#ffffff08}
+  .metric-footnote{margin:12px 2px 0;color:#91a4bc;font-size:11px;line-height:1.6}
+  .leaflet-control-layers,.leaflet-bar a{border:1px solid #34465d!important;background:#102036!important;color:#e8f0fb!important}
+  .leaflet-control-attribution{background:#0d1a2bcc!important;color:#c1cedc!important}
+  @media(max-width:1200px){.workspace-heading{grid-template-columns:minmax(220px,1fr) 180px auto;gap:10px;padding:20px}.orbit-visual{transform:scale(.82)}}
+  @media(max-width:1100px){.main-grid{grid-template-columns:190px minmax(0,1fr)}.main-panel{padding:23px 20px}.topbar{padding:15px 20px}.status-row{gap:9px}.status-card{padding:15px 13px}}
+  @media(max-width:900px){.workspace-heading{grid-template-columns:minmax(0,1fr) 175px;gap:8px 12px;min-height:0;padding:20px 22px}.hero-copy{grid-column:1;grid-row:1}.orbit-visual{grid-column:2;grid-row:1;transform:scale(.76)}.workspace-actions{grid-column:1/-1;grid-row:2;flex-direction:row;align-items:center;justify-content:flex-start;padding-top:10px;border-top:1px solid #29415a}}
+  @media(max-width:760px){.topbar{align-items:flex-start;padding:14px 16px}.brand-mark{width:38px;height:38px}.brand h2{font-size:14px}.topbar-right{gap:6px}.pill{font-size:9px;padding:6px 8px}.main-grid{grid-template-columns:1fr}.sidebar{padding:10px 12px;border-right:none;border-bottom:1px solid rgba(145,164,188,.13)}.sidebar:before{display:none}.sidebar .tabs{flex-direction:row;overflow-x:auto;gap:6px}.tabs button{width:auto;min-width:max-content;padding:10px}.tabs button:before{display:none}.main-panel{padding:18px 13px 26px;gap:15px}.workspace-heading{grid-template-columns:minmax(0,1fr) 155px;gap:8px 5px;padding:18px}.workspace-heading h1{font-size:22px}.workspace-heading p{font-size:12px}.orbit-visual{transform:scale(.68)}.workspace-actions{grid-column:1/-1;grid-row:2;flex-wrap:wrap;justify-content:flex-start}.status-row{grid-template-columns:repeat(2,minmax(0,1fr))}.status-card{min-height:100px}.status-card strong{font-size:25px}.metric-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.panel-card{padding:12px}.panel-title{align-items:flex-start;flex-direction:column;gap:4px}#map{height:55vh;min-height:320px}.box{height:30vh;min-height:220px}}
+  @media(max-width:520px){.workspace-heading{grid-template-columns:1fr;gap:4px}.hero-copy,.orbit-visual,.workspace-actions{grid-column:1;grid-row:auto}.orbit-visual{justify-self:center;margin:-2px 0 -7px;transform:scale(.74)}.workspace-actions{padding-top:10px}}
+  @media(prefers-reduced-motion:reduce){.orbit-ring,.orbit-satellite{animation:none}}
+  @media(max-width:420px){.brand h2{max-width:230px;font-size:12px}.topbar{gap:8px}.topbar-right{max-width:132px}.status-card{padding:13px 11px}.status-card strong{font-size:22px}}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">G</div>
+      <div>
+        <div class="eyebrow">GNSS Trust Monitor</div>
+        <h2>AI-Based GNSS Spoofing &amp; Jamming Detection</h2>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span class="pill live">DEMO MODE</span>
+    </div>
+  </header>
+
+  <div class="main-grid">
+    <aside class="sidebar">
+      <div class="tabs">
+        <button id="b1" class="on">Map</button>
+        <button id="b2">GPS vs IMU</button>
+        <button id="b3">Trust Score</button>
+        <button id="b4">GNSS Signal Quality</button>
+        <button id="b5">Evaluation Metrics</button>
+      </div>
+    </aside>
+
+    <main class="main-panel">
+      <section class="workspace-heading">
+        <div class="hero-copy"><div class="kicker">Situational awareness</div><h1>GNSS monitoring overview</h1><p>Three KITTI drives · model-based trust scoring · simulated attack scenarios.</p></div>
+        <div class="orbit-visual" aria-hidden="true">
+          <span class="orbit-label label-top">GNSS / ORBITAL VIEW</span>
+          <div class="orbit-ring"></div>
+          <div class="orbit-ring ring-two"></div>
+          <div class="orbit-ring ring-three"></div>
+          <div class="orbit-globe"></div>
+          <span class="orbit-satellite"></span>
+          <span class="orbit-satellite sat-two"></span>
+          <span class="orbit-label label-bottom">POSITION · SIGNAL · TRUST</span>
+        </div>
+        <div class="workspace-actions">
+          <span class="pill meta" id="datasetBadge">KITTI DEMO</span>
+          <span class="playback-clock" id="playbackClock">Waiting for readings</span>
+          <button class="playback-button" id="playbackToggle" type="button" disabled>Loading…</button>
+        </div>
+      </section>
+      <div class="status-row">
+        <div class="status-card trust-card"><label>Current trust score</label><div class="trust-readout"><strong id="trustScoreValue">--</strong><span class="unit">/ 100</span></div><div class="sub" id="trustState">Waiting for sample</div><div class="trust-meter"><span id="trustMeterFill"></span></div></div>
+        <div class="status-card"><label>Samples played</label><strong id="pointCount">0</strong><div class="sub">of demo recording</div></div>
+        <div class="status-card"><label>Attack samples · 12s</label><strong id="alertCount">0</strong><div class="sub">simulated scenario</div></div>
+        <div class="status-card"><label>Threshold</label><strong id="thresholdValue">0</strong><div class="sub">trust <</div></div>
+      </div>
+
+      <div id="p1" class="panel on">
+        <div class="panel-card">
+          <div class="panel-title"><h3>Position integrity map</h3><span>Event markers identify simulated attack periods</span></div>
+          <div class="note">Attacks are <b>simulated</b>. Green = trusted, yellow = suspicious, red = spoofing alert, purple = jamming alert, orange = unclassified anomaly.</div>
+          <div id="alerts1" class="alerts"></div>
+          <div id="map"></div>
+        </div>
+      </div>
+
+      <div id="p2" class="panel">
+        <div class="panel-card">
+          <div class="panel-title"><h3>Sensor fusion</h3><span>GPS movement compared with inertial estimates</span></div>
+          <div class="note">Divergence can result from spoofing OR from IMU drift, sensor error, synchronization error or normal estimation uncertainty. It is one indicator, not proof of spoofing.</div>
+          <div class="box"><canvas id="c1"></canvas></div>
+          <div class="box"><canvas id="c2"></canvas></div>
+        </div>
+      </div>
+
+      <div id="p3" class="panel">
+        <div class="panel-card">
+          <div class="panel-title"><h3>Trust score timeline</h3><span>Confidence score and alert threshold</span></div>
+          <div class="note">Trust score 0-100 (100 = fully trusted). An alert is raised when it falls below the threshold line. Shaded truth = simulated attack periods.</div>
+          <div class="box" style="height:45vh"><canvas id="c3"></canvas></div>
+        </div>
+      </div>
+
+      <div id="p4" class="panel">
+        <div class="panel-card">
+          <div class="panel-title"><h3>GNSS signal quality</h3><span>Signal-strength indicators and inferred interference</span></div>
+          <div class="note">Real recorded jamming/spoofing (Jammertest 2024). Signal module: C/N0, satellite count, trust score. Rows are sampled across all files and include training data.</div>
+          <div id="alerts4" class="alerts"></div>
+          <div class="box"><canvas id="c4"></canvas></div>
+          <div class="box"><canvas id="c5"></canvas></div>
+        </div>
+      </div>
+
+      <div id="p5" class="panel">
+        <div class="panel-card">
+          <div class="panel-title"><h3>Evaluation metrics</h3><span>Held-out test split · metrics from the latest training run</span></div>
+          <div class="note">Attack examples are simulated on KITTI data. These scores evaluate the simulated scenarios and should not be read as real-world jamming or spoofing performance.</div>
+          <div id="evaluationMetrics"><div class="alerts"><div class="ok">Loading evaluation results…</div></div></div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+const API = "http://127.0.0.1:8000";
+let charts = [], map, mapFeatures, mapHasFit = false, playbackTimer = null, playbackData = null, playbackIndex = 0, playbackMarker = null;
+const PLAYBACK_INTERVAL_MS = 100;
+const CHART_WINDOW = 120;
+const NAMES = ["", "Spoofing", "Jamming", "Unclassified anomaly"];
+function clearCharts(){
+  charts.forEach(c => c.destroy());
+  charts = [];
+}
+function renderLiveDemo(){
+  fetch(API + "/live_demo").then(r => r.json()).then(d => {
+    if (!d.lat || !d.lat.length) throw new Error("The API returned no demo data");
+    playbackData = d;
+    const opt = {
+      maintainAspectRatio: false, animation: false, color: "#b8c8d9",
+      plugins: {legend: {labels: {color: "#cbd8e6", usePointStyle: true, boxWidth: 8}},
+        tooltip: {backgroundColor: "#102036", titleColor: "#fff", bodyColor: "#dbe7f3", borderColor: "#34465d", borderWidth: 1}},
+      scales: {x: {ticks: {color: "#8195ad", maxTicksLimit: 10}, grid: {color: "rgba(145,164,188,.08)"}},
+        y: {ticks: {color: "#8195ad"}, grid: {color: "rgba(145,164,188,.11)"}}}
+    };
+    const alerts = d.alert.reduce((a, b) => a + b, 0);
+  document.getElementById("playbackClock").textContent = `Ready · threshold ${d.thr}`;
+  if (d.datasets && d.datasets.length) {
+    document.getElementById("datasetBadge").textContent = `TRAINED ON ${d.datasets.length} DATASETS`;
+  }
+  if (d.training_rows) {
+    document.querySelector(".status-card .sub").textContent = `${d.training_rows.toLocaleString()} training rows`;
+  }
+  updateSummary(d);
+  showAlerts("alerts1", d.type);
+    const colors = {1: "#ef4444", 2: "#c084fc", 3: "#f59e0b"};
+    if (!map) {
+      map = L.map("map").setView([d.lat[0], d.lon[0]], 15);
+      const street = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom: 19, attribution: "© OpenStreetMap"});
+      const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {maxZoom: 19, attribution: "Tiles © Esri"});
+      sat.addTo(map);
+      L.control.layers({"Satellite": sat, "Street": street}).addTo(map);
+      const legend = L.control({position: "bottomright"});
+      legend.onAdd = () => {
+        const div = L.DomUtil.create("div");
+        div.style.cssText = "background:#0f172a;color:#e2e8f0;padding:9px 12px;border:1px solid #475569;border-radius:8px;line-height:1.8;font:12px Segoe UI,sans-serif";
+        div.innerHTML = `<b>Map legend</b><br><span style="color:${colors[1]}">●</span> Spoofing &nbsp; <span style="color:${colors[2]}">●</span> Jamming<br><span style="color:${colors[3]}">●</span> Anomaly &nbsp; <span style="color:#22c55e">●</span> Trusted`;
+        return div;
+      };
+      legend.addTo(map);
+      mapFeatures = L.featureGroup().addTo(map);
+      playbackMarker = L.circleMarker([d.lat[0], d.lon[0]], {
+        radius: 7, color: "#07111f", weight: 3, fillColor: "#4cc9f0", fillOpacity: 1
+      }).bindPopup("Current playback position").addTo(map);
+    } else {
+      mapFeatures.clearLayers();
+    }
+
+    for (let i = 1; i < d.lat.length; i++) {
+      const c = colors[d.type[i]] || (d.trust[i] < d.thr + 20 ? "#fbbf24" : "#22c55e");
+      L.polyline([[d.lat[i-1], d.lon[i-1]], [d.lat[i], d.lon[i]]], {
+        color: c, weight: d.type[i] > 0 ? 6 : 3, opacity: 1
+      }).addTo(mapFeatures);
+    }
+
+    // A stationary spoof/jamming position has no visible line length, so mark each event explicitly.
+    for (let start = 0; start < d.type.length;) {
+      const type = d.type[start];
+      let end = start;
+      while (end + 1 < d.type.length && d.type[end + 1] === type) end++;
+      if (type > 0) {
+        const point = Math.floor((start + end) / 2);
+        const marker = L.circleMarker([d.lat[point], d.lon[point]], {
+          radius: type === 2 ? 11 : 8, color: "#ffffff", weight: 3,
+          fillColor: colors[type] || colors[3], fillOpacity: 1
+        }).addTo(mapFeatures);
+        marker.bindPopup(`${NAMES[type]} event: points ${start}-${end}`);
+      }
+      start = end + 1;
+    }
+
+    if (playbackMarker) playbackMarker.setLatLng([d.lat[playbackIndex], d.lon[playbackIndex]]);
+    if (!mapHasFit) {
+      map.fitBounds(L.latLngBounds(d.lat.map((v, i) => [v, d.lon[i]])));
+      mapHasFit = true;
+    }
+
+    clearCharts();
+    const frame = playbackFrame(d, playbackIndex);
+    charts.push(new Chart("c1", {type: "line", data: {labels: frame.labels, datasets: [
+      {label: "GPS speed (m/s)", data: frame.gps, borderColor: "#38bdf8", pointRadius: 0, borderWidth: 2},
+      {label: "IMU speed (m/s)", data: frame.imu, borderColor: "#ff9f43", pointRadius: 0, borderWidth: 3, borderDash: [8, 4]}]}, options: opt}));
+    charts.push(new Chart("c2", {type: "line", data: {labels: frame.labels, datasets: [
+      {label: "GPS-IMU residual (m)", data: frame.residual, borderColor: "#f87171", pointRadius: 0, borderWidth: 2}]}, options: opt}));
+    charts.push(new Chart("c3", {type: "line", data: {labels: frame.labels, datasets: [
+      {label: "Trust score", data: frame.trust, borderColor: "#38bdf8", pointRadius: 0, borderWidth: 2},
+      {label: "Alert threshold", data: frame.threshold, borderColor: "#f87171", borderDash: [6, 4], pointRadius: 0},
+      {label: "Simulated attack", data: frame.truth, borderColor: "rgba(192,132,252,.8)", backgroundColor: "rgba(192,132,252,.15)", fill: true, stepped: true, pointRadius: 0}]},
+      options: {...opt, scales: {...opt.scales, y: {min: 0, max: 100, ticks: {color: "#8195ad"}, grid: {color: "rgba(145,164,188,.11)"}}}}}));
+    playbackIndex = 0;
+    document.getElementById("playbackToggle").disabled = false;
+    document.getElementById("playbackToggle").textContent = "Pause playback";
+    playbackTimer = setInterval(advancePlayback, PLAYBACK_INTERVAL_MS);
+  }).catch(e => {
+    document.getElementById("playbackClock").textContent =
+      "API error: " + e.message + " (check http://127.0.0.1:8000/docs)";
+  });
+}
+function playbackFrame(d, end) {
+  const start = Math.max(0, end - CHART_WINDOW + 1);
+  const indices = Array.from({length: end - start + 1}, (_, offset) => start + offset);
+  return {
+    labels: indices.map(i => (i / 10).toFixed(1)),
+    gps: indices.map(i => d.gps_speed[i]),
+    imu: indices.map(i => d.imu_speed[i]),
+    residual: indices.map(i => d.residual[i]),
+    trust: indices.map(i => d.trust[i]),
+    threshold: indices.map(() => d.thr),
+    truth: indices.map(i => d.truth[i] * 100)
+  };
+}
+function advancePlayback() {
+  if (!playbackData) return;
+  playbackIndex = (playbackIndex + 1) % playbackData.trust.length;
+  const frame = playbackFrame(playbackData, playbackIndex);
+  charts[0].data.labels = frame.labels;
+  charts[0].data.datasets[0].data = frame.gps;
+  charts[0].data.datasets[1].data = frame.imu;
+  charts[1].data.labels = frame.labels;
+  charts[1].data.datasets[0].data = frame.residual;
+  charts[2].data.labels = frame.labels;
+  charts[2].data.datasets.forEach((dataset, i) => {
+    dataset.data = [frame.trust, frame.threshold, frame.truth][i];
+  });
+  charts.forEach(chart => chart.update("none"));
+  playbackMarker.setLatLng([playbackData.lat[playbackIndex], playbackData.lon[playbackIndex]]);
+  updateSummary(playbackData);
+  const alertStart = Math.max(0, playbackIndex - CHART_WINDOW + 1);
+  showAlerts("alerts1", playbackData.type.slice(alertStart, playbackIndex + 1), alertStart);
+  document.getElementById("playbackClock").textContent =
+    `Playback ${((playbackIndex / 10) % 60).toFixed(1)}s · 10 Hz`;
+}
+function showAlerts(id, type, offset = 0) {               // merge consecutive alert points into events
+  const ev = []; let cur = null;
+  for (let i = 0; i <= type.length; i++) {
+    const t = i < type.length ? type[i] : 0;
+    if (cur && t != cur.t) { ev.push({t: cur.t, a: cur.a + offset, b: i - 1 + offset}); cur = null; }
+    if (!cur && t > 0) cur = {t: t, a: i};
+  }
+  const el = document.getElementById(id);
+  if (!ev.length) { el.innerHTML = '<div class="ok">No alerts</div>'; return; }
+  const count = k => ev.filter(e => e.t == k).length;
+  el.innerHTML = '<div class="bad"><b>ALERT</b> - spoofing events: ' + count(1) + ' | jamming events: ' + count(2) +
+    ' | unclassified: ' + count(3) + '<br>' + ev.slice(0, 8).map(e => NAMES[e.t] + ": points " + e.a + "-" + e.b).join("<br>") +
+    (ev.length > 8 ? "<br>... and " + (ev.length - 8) + " more" : "") + '</div>';
+}
+function show(n){
+  for (const i of [1, 2, 3, 4, 5]) { document.getElementById("p"+i).classList.toggle("on", i==n); document.getElementById("b"+i).classList.toggle("on", i==n); }
+  if (n==1 && map) map.invalidateSize();
+  charts.forEach(c => c.resize());
+}
+document.getElementById("playbackToggle").onclick = () => {
+  const button = document.getElementById("playbackToggle");
+  if (playbackTimer) {
+    clearInterval(playbackTimer);
+    playbackTimer = null;
+    button.textContent = "Resume playback";
+  } else if (playbackData) {
+    playbackTimer = setInterval(advancePlayback, PLAYBACK_INTERVAL_MS);
+    button.textContent = "Pause playback";
+  }
+};
+b1.onclick = () => show(1); b2.onclick = () => show(2); b3.onclick = () => show(3); b4.onclick = () => show(4); b5.onclick = () => show(5);
+
+function updateSummary(d){
+  const start = Math.max(0, playbackIndex - CHART_WINDOW + 1);
+  const alerts = d.alert.slice(start, playbackIndex + 1).reduce((a, b) => a + b, 0);
+  document.getElementById("pointCount").textContent = `${playbackIndex + 1} / ${d.trust.length}`;
+  document.getElementById("alertCount").textContent = alerts;
+  document.getElementById("thresholdValue").textContent = d.thr;
+  const score = d.trust[playbackIndex];
+  const scoreColor = score < d.thr ? "var(--red)" : "var(--cyan)";
+  document.getElementById("trustScoreValue").textContent = score.toFixed(1);
+  document.getElementById("trustScoreValue").style.color = scoreColor;
+  document.getElementById("trustState").textContent =
+    score < d.thr ? "Below threshold · alert" : "Within trusted range";
+  document.getElementById("trustMeterFill").style.width = `${Math.max(0, Math.min(100, score))}%`;
+  document.getElementById("trustMeterFill").style.backgroundColor = scoreColor;
+}
+
+renderLiveDemo();
+
+function formatPercent(value) {
+  return value == null || !Number.isFinite(value) ? "N/A" : `${(value * 100).toFixed(1)}%`;
+}
+fetch(API + "/evaluation").then(response => {
+  if (!response.ok) throw new Error(`Request failed (${response.status})`);
+  return response.json();
+}).then(data => {
+  if (data.error) throw new Error(data.error);
+  const classes = ["normal", "spoofing", "jamming"];
+  const detectors = data.detectors.map(metric => `
+    <tr><td>${metric.model}</td><td>${formatPercent(metric.accuracy)}</td>
+    <td>${formatPercent(metric.precision)}</td><td>${formatPercent(metric.recall)}</td>
+    <td>${formatPercent(metric.f1)}</td><td>${formatPercent(metric.roc_auc)}</td>
+    <td>${formatPercent(metric.false_alarm_rate)}</td></tr>`).join("");
+  const classRows = classes.map(name => {
+    const metric = data.classes[name];
+    return `<tr><td>${name}</td><td>${formatPercent(metric.precision)}</td>
+      <td>${formatPercent(metric.recall)}</td><td>${formatPercent(metric.f1)}</td>
+      <td>${metric.support}</td></tr>`;
+  }).join("");
+  const delay = data.mean_detection_delay_seconds == null
+    ? "N/A" : `${data.mean_detection_delay_seconds.toFixed(3)} s`;
+  document.getElementById("evaluationMetrics").innerHTML = `
+    <div class="metric-summary">
+      <article><label>Training samples</label><strong>${data.training_rows}</strong><small>Used to fit models</small></article>
+      <article><label>Test samples</label><strong>${data.test_rows}</strong><small>Held out from fitting</small></article>
+      <article><label>Detection delay</label><strong>${delay}</strong><small>Mean over detected test events</small></article>
+      <article><label>Test attack events</label><strong>${data.attack_events_detected} / ${data.attack_events_total}</strong><small>At least one alert per event</small></article>
+    </div>
+    <div class="metric-block"><h4>Detector comparison</h4>
+      <table class="metric-table"><thead><tr><th>Detector</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1</th><th>ROC AUC</th><th>False alarm</th></tr></thead>
+      <tbody>${detectors}</tbody></table>
+    </div>
+    <div class="metric-block"><h4>Random Forest · three-class results</h4>
+      <table class="metric-table"><thead><tr><th>Class</th><th>Precision</th><th>Recall</th><th>F1</th><th>Test support</th></tr></thead>
+      <tbody>${classRows}</tbody></table>
+    </div>
+    <p class="metric-footnote">Chronological 60/20/20 train/validation/test split per drive. Alert threshold ${data.threshold}; trust weights (Isolation Forest / Random Forest / GPS–IMU residual): ${data.weights.map(value => value.toFixed(1)).join(" / ")}. A zero-support class has no test examples, so its score is not a meaningful performance estimate.</p>`;
+}).catch(error => {
+  document.getElementById("evaluationMetrics").innerHTML =
+    `<div class="alerts"><div class="bad">Evaluation metrics unavailable: ${error.message}. Rerun <code>python -m src.evaluate</code> and restart the API.</div></div>`;
+});
+
+fetch(API + "/signal_demo").then(r => r.json()).then(d => {
+  if (d.error) { document.getElementById("p4").insertAdjacentHTML("beforeend", "<p>" + d.error + "</p>"); return; }
+  const x = d.trust.map((_, i) => i), opt = {
+    maintainAspectRatio: false, animation: false, color: "#b8c8d9",
+    plugins: {legend: {labels: {color: "#cbd8e6", usePointStyle: true, boxWidth: 8}},
+      tooltip: {backgroundColor: "#102036", titleColor: "#fff", bodyColor: "#dbe7f3", borderColor: "#34465d", borderWidth: 1}},
+    scales: {x: {ticks: {color: "#8195ad", maxTicksLimit: 10}, grid: {color: "rgba(145,164,188,.08)"}},
+      y: {ticks: {color: "#8195ad"}, grid: {color: "rgba(145,164,188,.11)"}}}
+  };
+  showAlerts("alerts4", d.type);
+  charts.push(new Chart("c4", {type: "line", data: {labels: x, datasets: [
+    {label: "C/N0 (dB-Hz)", data: d.cn0, borderColor: "#38bdf8", pointRadius: 0},
+    {label: "Satellites", data: d.nsat, borderColor: "#a3e635", pointRadius: 0}]}, options: opt}));
+  charts.push(new Chart("c5", {type: "line", data: {labels: x, datasets: [
+    {label: "Signal trust score", data: d.trust, borderColor: "#38bdf8", pointRadius: 0},
+    {label: "Alert threshold", data: x.map(() => d.thr), borderColor: "#f87171", borderDash: [6, 4], pointRadius: 0},
+    {label: "Real attack (truth)", data: d.truth.map(v => v * 100), borderColor: "rgba(156,163,175,0.6)", backgroundColor: "rgba(156,163,175,0.2)", fill: true, stepped: true, pointRadius: 0}]},
+    options: {...opt, scales: {y: {min: 0, max: 100}}}}));
+}).catch(() => {});
+</script>
+</body>
+</html>
