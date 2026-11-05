@@ -3,6 +3,7 @@ from pathlib import Path
 
 import joblib, numpy as np, pandas as pd
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from src.data import load
@@ -15,6 +16,9 @@ MODELS_DIR = PROJECT_ROOT / "models"
 DATA_DIR = PROJECT_ROOT / "data"
 
 app = FastAPI()
+@app.get("/")
+def home():
+    return FileResponse(PROJECT_ROOT / "frontend" / "index.html")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 m = joblib.load(MODELS_DIR / "trust.pkl")                      # made by: python -m src.evaluate
 sig = joblib.load(MODELS_DIR / "trust_signal.pkl") if (MODELS_DIR / "trust_signal.pkl").exists() else None   # made by: python -m src.evaluate_signal
